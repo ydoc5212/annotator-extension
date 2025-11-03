@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { HighlightAnnotation } from '../types';
+import { getNodeByXPath } from '../utils/xpath';
 
 interface HighlightLayerProps {
   highlights: HighlightAnnotation[];
@@ -23,99 +24,120 @@ export const HighlightLayer: React.FC<HighlightLayerProps> = ({ highlights, onDe
 
     const highlightElements: HTMLElement[] = [];
 
-    // Find and highlight text in the DOM
-    const findAndHighlightText = (highlight: HighlightAnnotation) => {
-      const searchText = highlight.textBefore + highlight.text + highlight.textAfter;
-      const bodyText = document.body.innerText;
+    // Restore each highlight using XPath
+    highlights.forEach((highlight) => {
+      try {
+        // Get nodes from XPaths
+        const startContainer = getNodeByXPath(highlight.startContainerXPath);
+        const endContainer = getNodeByXPath(highlight.endContainerXPath);
 
-      // Find the occurrence of our text in the page
-      const index = bodyText.indexOf(searchText);
-      if (index === -1) {
-        // Try just the highlighted text if context doesn't match
-        const simpleIndex = bodyText.indexOf(highlight.text);
-        if (simpleIndex === -1) return;
-      }
+        if (!startContainer || !endContainer) return;
 
-      // Walk through all text nodes to find the match
-      const walker = document.createTreeWalker(
-        document.body,
-        NodeFilter.SHOW_TEXT,
-        {
-          acceptNode: (node) => {
-            // Skip our toolbar and existing highlights
-            const parent = node.parentElement;
-            if (parent?.closest('[data-annotator-toolbar]') ||
-                parent?.closest('[data-highlight-id]') ||
-                parent?.closest('script') ||
-                parent?.closest('style')) {
-              return NodeFilter.FILTER_REJECT;
+        // Create Range from XPath data
+        const range = document.createRange();
+        range.setStart(startContainer, highlight.startOffset);
+        range.setEnd(endContainer, highlight.endOffset);
+
+        // Extract the contents and wrap each text node individually
+        // This handles spans across multiple elements (links, formatting, etc.)
+        const fragment = range.cloneContents();
+        const walker = document.createTreeWalker(
+          fragment,
+          NodeFilter.SHOW_TEXT,
+          null
+        );
+
+        const textNodes: Text[] = [];
+        let node: Node | null;
+        while ((node = walker.nextNode())) {
+          textNodes.push(node as Text);
+        }
+
+        // Walk through the actual DOM range and wrap each text node
+        const rangeWalker = document.createTreeWalker(
+          range.commonAncestorContainer,
+          NodeFilter.SHOW_TEXT,
+          {
+            acceptNode: (node) => {
+              return range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
             }
-            return NodeFilter.FILTER_ACCEPT;
+          }
+        );
+
+        const nodesToWrap: { node: Text; startOffset: number; endOffset: number }[] = [];
+        while ((node = rangeWalker.nextNode())) {
+          const textNode = node as Text;
+
+          // Calculate the portion of this text node that's in the range
+          let startOffset = 0;
+          let endOffset = textNode.length;
+
+          if (textNode === startContainer) {
+            startOffset = highlight.startOffset;
+          }
+          if (textNode === endContainer) {
+            endOffset = highlight.endOffset;
+          }
+
+          if (startOffset < endOffset) {
+            nodesToWrap.push({ node: textNode, startOffset, endOffset });
           }
         }
-      );
 
-      const textNodes: Text[] = [];
-      let node: Node | null;
-      while ((node = walker.nextNode())) {
-        textNodes.push(node as Text);
-      }
+        // Wrap each text node portion
+        nodesToWrap.forEach(({ node, startOffset, endOffset }) => {
+          const span = document.createElement('span');
+          span.setAttribute('data-highlight-id', highlight.id);
+          span.style.backgroundColor = highlight.color;
+          span.style.opacity = '0.5';
+          span.style.transition = 'opacity 0.2s';
+          span.style.cursor = onDelete ? 'pointer' : 'default';
 
-      // Search through text nodes for our highlight
-      for (const textNode of textNodes) {
-        const text = textNode.textContent || '';
-        const highlightIndex = text.indexOf(highlight.text);
-
-        if (highlightIndex !== -1) {
-          // Check context if available
-          const before = text.substring(Math.max(0, highlightIndex - 50), highlightIndex);
-          const after = text.substring(
-            highlightIndex + highlight.text.length,
-            Math.min(text.length, highlightIndex + highlight.text.length + 50)
-          );
-
-          // If context matches or we don't have context, apply highlight
-          if (!highlight.textBefore || !highlight.textAfter ||
-              (before.endsWith(highlight.textBefore) && after.startsWith(highlight.textAfter))) {
-
-            try {
-              const range = document.createRange();
-              range.setStart(textNode, highlightIndex);
-              range.setEnd(textNode, highlightIndex + highlight.text.length);
-
-              const span = document.createElement('span');
-              span.setAttribute('data-highlight-id', highlight.id);
-              span.style.backgroundColor = highlight.color;
+          if (onDelete) {
+            span.onclick = (e) => {
+              e.stopPropagation();
+              onDelete(highlight.id);
+            };
+            span.onmouseenter = () => {
+              span.style.opacity = '0.7';
+            };
+            span.onmouseleave = () => {
               span.style.opacity = '0.5';
-              span.style.transition = 'opacity 0.2s';
-              span.style.cursor = onDelete ? 'pointer' : 'default';
-
-              if (onDelete) {
-                span.onclick = (e) => {
-                  e.stopPropagation();
-                  onDelete(highlight.id);
-                };
-                span.onmouseenter = () => {
-                  span.style.opacity = '0.7';
-                };
-                span.onmouseleave = () => {
-                  span.style.opacity = '0.5';
-                };
-              }
-
-              range.surroundContents(span);
-              highlightElements.push(span);
-              return; // Only highlight first occurrence
-            } catch (e) {
-              console.warn('Could not apply highlight:', e);
-            }
+            };
           }
-        }
-      }
-    };
 
-    // Apply all highlights
-    highlights.forEach(findAndHighlightText);
+          // Split the text node and wrap the middle portion
+          const textContent = node.textContent || '';
+
+          if (startOffset > 0) {
+            // Split before
+            const beforeText = textContent.substring(0, startOffset);
+            const beforeNode = document.createTextNode(beforeText);
+            node.parentNode?.insertBefore(beforeNode, node);
+          }
+
+          // Create highlighted portion
+          const highlightedText = textContent.substring(startOffset, endOffset);
+          span.textContent = highlightedText;
+          node.parentNode?.insertBefore(span, node);
+
+          if (endOffset < textContent.length) {
+            // Split after
+            const afterText = textContent.substring(endOffset);
+            const afterNode = document.createTextNode(afterText);
+            node.parentNode?.insertBefore(afterNode, node);
+          }
+
+          // Remove original node
+          node.parentNode?.removeChild(node);
+
+          highlightElements.push(span);
+        });
+
+      } catch (error) {
+        // Silent error
+      }
+    });
 
     // Cleanup
     return () => {

@@ -5,7 +5,7 @@ interface DrawingCanvasProps {
   isDrawing: boolean;
   color: string;
   strokeWidth: number;
-  onDrawingComplete: (paths: Position[][]) => void;
+  onDrawingComplete: (path: Position[]) => void;
   existingDrawings: DrawingAnnotation[];
   onDelete?: (id: string) => void;
 }
@@ -21,19 +21,19 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawingActive, setIsDrawingActive] = useState(false);
   const [currentPath, setCurrentPath] = useState<Position[]>([]);
-  const [allPaths, setAllPaths] = useState<Position[][]>([]);
-  const [isErasing, setIsErasing] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Set canvas to match viewport size with proper DPI
+    // Set canvas to match document size (not viewport) with proper DPI
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = window.innerWidth * dpr;
-    canvas.height = window.innerHeight * dpr;
-    canvas.style.width = `${window.innerWidth}px`;
-    canvas.style.height = `${window.innerHeight}px`;
+    const docWidth = Math.max(document.documentElement.scrollWidth, window.innerWidth);
+    const docHeight = Math.max(document.documentElement.scrollHeight, window.innerHeight);
+    canvas.width = docWidth * dpr;
+    canvas.height = docHeight * dpr;
+    canvas.style.width = `${docWidth}px`;
+    canvas.style.height = `${docHeight}px`;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -60,21 +60,6 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       });
     });
 
-    // Draw current paths
-    allPaths.forEach((path) => {
-      if (path.length < 2) return;
-      ctx.strokeStyle = color;
-      ctx.lineWidth = strokeWidth;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.beginPath();
-      ctx.moveTo(path[0].x, path[0].y);
-      for (let i = 1; i < path.length; i++) {
-        ctx.lineTo(path[i].x, path[i].y);
-      }
-      ctx.stroke();
-    });
-
     // Draw current path
     if (currentPath.length > 1) {
       ctx.strokeStyle = color;
@@ -88,7 +73,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       }
       ctx.stroke();
     }
-  }, [existingDrawings, allPaths, currentPath, color, strokeWidth]);
+  }, [existingDrawings, currentPath, color, strokeWidth]);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawing) {
@@ -117,7 +102,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
       return;
     }
     setIsDrawingActive(true);
-    setCurrentPath([{ x: e.pageX, y: e.pageY }]);
+    setCurrentPath([{ x: e.clientX, y: e.clientY }]);
   };
 
   // Helper function to calculate distance from point to line segment
@@ -139,16 +124,14 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawing || !isDrawingActive) return;
-    setCurrentPath((prev) => [...prev, { x: e.pageX, y: e.pageY }]);
+    setCurrentPath((prev) => [...prev, { x: e.clientX, y: e.clientY }]);
   };
 
   const handleMouseUp = () => {
     if (!isDrawing || !isDrawingActive) return;
     setIsDrawingActive(false);
     if (currentPath.length > 1) {
-      const newPaths = [...allPaths, currentPath];
-      setAllPaths(newPaths);
-      onDrawingComplete(newPaths);
+      onDrawingComplete(currentPath);
     }
     setCurrentPath([]);
   };
@@ -157,7 +140,7 @@ export const DrawingCanvas: React.FC<DrawingCanvasProps> = ({
     <canvas
       ref={canvasRef}
       style={{
-        position: 'fixed',
+        position: 'absolute',
         top: 0,
         left: 0,
         width: '100vw',

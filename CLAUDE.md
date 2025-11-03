@@ -1,0 +1,1 @@
+- Bias towards rewriting small, insignificant implementations when they're not working rather than trying to fix them. This only applies to new code, this does not apply to old or well-established code. This mainly applies to when we are prototyping or iterating rapidly.

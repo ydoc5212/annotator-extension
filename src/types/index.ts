@@ -1,6 +1,6 @@
 export type AnnotationType = 'highlight' | 'note' | 'drawing';
 
-export type ToolType = AnnotationType | 'eraser' | 'select';
+export type ToolType = AnnotationType | 'eraser' | 'select' | 'paint-bucket';
 
 export interface Position {
   x: number;
@@ -12,9 +12,11 @@ export interface HighlightAnnotation {
   type: 'highlight';
   color: string;
   text: string;
-  // Store the text context around the highlight for better matching
-  textBefore: string;
-  textAfter: string;
+  // XPath-based Range storage for accurate restoration
+  startContainerXPath: string;
+  startOffset: number;
+  endContainerXPath: string;
+  endOffset: number;
   timestamp: number;
 }
 

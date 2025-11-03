@@ -3,7 +3,7 @@
   "name": "Web Annotator",
   "version": "1.0.0",
   "description": "Annotate web pages with highlights, notes, and drawings",
-  "permissions": ["storage", "activeTab"],
+  "permissions": ["activeTab"],
   "background": {
     "service_worker": "background.js"
   },
