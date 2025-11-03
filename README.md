@@ -13,30 +13,25 @@ Annotate web pages like a PDF - highlight text, add notes, and draw on any webpa
 
 ## Installation
 
-### Option 1: Quick Install (Recommended)
+### Easy Install (No coding required!)
 
-1. **Download the extension**
-   - Click the green "Code" button above → Download ZIP
-   - Unzip the file to a folder you'll remember (like `Downloads/web-annotator`)
-
-2. **Install in Chrome**
-   - Open Chrome
-   - Type `chrome://extensions` in the address bar and press Enter
-   - Turn on "Developer mode" (toggle switch in the top right)
-   - Click "Load unpacked" button
-   - Select the `dist` folder inside the unzipped folder
+1. **Download**: Go to [Releases](https://github.com/ydoc5212/annotator-extension/releases) and download `web-annotator-v1.0.0.zip`
+2. **Unzip** the file
+3. **Install in Chrome**:
+   - Open Chrome and type `chrome://extensions` in the address bar
+   - Turn ON "Developer mode" (toggle in top right)
+   - Click "Load unpacked"
+   - Select the unzipped folder
    - Done! The extension icon appears in your toolbar
 
-### Option 2: Build from Source (For Developers)
+### Build from Source (For Developers)
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/annotator-extension.git
+git clone https://github.com/ydoc5212/annotator-extension.git
 cd annotator-extension
 npm install
 npm run build
 ```
-
-Then follow step 2 from Option 1 above.
 
 ## How to Use
 
