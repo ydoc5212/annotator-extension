@@ -35,15 +35,14 @@ npm run build
 
 ## How to Use
 
-1. **Turn it on**: Click the extension icon in your Chrome toolbar → Click "Enable Annotator"
-2. **Pick a tool**: Click the toolbar that appears (top-left of page)
+1. **Toggle on/off**: Click the extension icon in your Chrome toolbar (toggles annotator)
+2. **Pick a tool**: Use the toolbar that appears (top-left of page)
    - 🖱️ Cursor = normal browsing
    - ✨ Highlighter = select text to highlight
    - 📝 Note = click anywhere to add a note
    - ✏️ Pencil = click and drag to draw
    - 🗑️ Eraser = click any annotation to delete it
 3. **Change colors**: Click the colored circles
-4. **Turn it off**: Click the extension icon → Click "Disable Annotator"
 
 ## Troubleshooting
 

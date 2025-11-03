@@ -25,10 +25,10 @@ export const App: React.FC = () => {
     loadAnnotations(currentUrl).then(setAnnotations);
     loadEnabledState(currentUrl).then(setIsEnabled);
 
-    // Listen for toggle messages from popup
+    // Listen for toggle messages from extension icon click
     const handleMessage = (message: any) => {
       if (message.type === 'TOGGLE_ANNOTATOR') {
-        setIsEnabled(message.isEnabled);
+        setIsEnabled((prev) => !prev);
       }
     };
 
