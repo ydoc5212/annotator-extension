@@ -15,7 +15,7 @@ Annotate web pages like a PDF - highlight text, add notes, and draw on any webpa
 
 ### Easy Install (No coding required!)
 
-1. **Download**: Go to [Releases](https://github.com/ydoc5212/annotator-extension/releases) and download `web-annotator-v1.0.0.zip`
+1. **Download**: Go to [Releases](https://github.com/ydoc5212/annotator-extension/releases) and download the most recent .zip file
 2. **Unzip** the file
 3. **Install in Chrome**:
    - Open Chrome and type `chrome://extensions` in the address bar
