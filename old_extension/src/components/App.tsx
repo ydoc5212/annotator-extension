@@ -3,6 +3,7 @@ import { Toolbar } from './Toolbar';
 import { HighlightLayer } from './HighlightLayer';
 import { NoteLayer } from './NoteLayer';
 import { DrawingCanvas } from './DrawingCanvas';
+import { PageColorLayer } from './PageColorLayer';
 import {
   Annotation,
   HighlightAnnotation,
@@ -188,49 +189,117 @@ export const App: React.FC = () => {
     };
   }, []);
 
+  // Helper: Determine if element should be text or background color
+  const getColorType = (element: HTMLElement): 'text' | 'background' => {
+    const tag = element.tagName.toLowerCase();
+    const textTags = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'a', 'li', 'td', 'th', 'label', 'button', 'strong', 'em', 'code'];
+    return textTags.includes(tag) ? 'text' : 'background';
+  };
+
+  // Caches for shouldIgnore checks to avoid repeated closest() calls
+  const ignoredElementsCache = useRef(new WeakSet<HTMLElement>());
+  const validElementsCache = useRef(new WeakSet<HTMLElement>());
+
+  // Helper: Check if element should be ignored (memoized with WeakSet cache)
+  const shouldIgnore = useCallback((element: HTMLElement): boolean => {
+    // Check cache first
+    if (ignoredElementsCache.current.has(element)) return true;
+    if (validElementsCache.current.has(element)) return false;
+
+    // Perform check
+    const isIgnored =
+      element.closest('[data-annotator-toolbar]') ||
+      element.closest('[data-note-id]') ||
+      element.closest('[data-highlight-id]') ||
+      ['script', 'style', 'meta', 'link', 'noscript', 'input', 'select', 'textarea'].includes(element.tagName.toLowerCase());
+
+    // Cache result
+    if (isIgnored) {
+      ignoredElementsCache.current.add(element);
+    } else {
+      validElementsCache.current.add(element);
+    }
+
+    return isIgnored;
+  }, []);
+
+  // Cache XPath generation to avoid repeated recursive walks
+  const xpathCache = useRef(new WeakMap<Node, string>());
+
   const handlePaintBucket = useCallback((e: MouseEvent) => {
     const { currentColor, setAnnotations } = stateRef.current;
-
     e.preventDefault();
     e.stopPropagation();
 
-    const clickedElement = e.target as HTMLElement;
+    const target = e.target as HTMLElement;
 
-    // Skip toolbar
-    if (clickedElement.closest('[data-annotator-toolbar]')) {
-      return;
-    }
-
-    // Try to find a note
-    const noteDiv = clickedElement.closest('[data-note-id]');
+    // Handle existing annotations
+    const noteDiv = target.closest('[data-note-id]');
     if (noteDiv) {
       const noteId = noteDiv.getAttribute('data-note-id');
       if (noteId) {
         setAnnotations((prev) =>
-          prev.map((annotation) =>
-            annotation.id === noteId && annotation.type === 'note'
-              ? { ...annotation, color: currentColor }
-              : annotation
-          )
+          prev.map((a) => a.id === noteId && a.type === 'note' ? { ...a, color: currentColor } : a)
         );
         return;
       }
     }
 
-    // Try to find a highlight
-    const highlightSpan = clickedElement.closest('[data-highlight-id]');
+    const highlightSpan = target.closest('[data-highlight-id]');
     if (highlightSpan) {
       const highlightId = highlightSpan.getAttribute('data-highlight-id');
       if (highlightId) {
         setAnnotations((prev) =>
-          prev.map((annotation) =>
-            annotation.id === highlightId && annotation.type === 'highlight'
-              ? { ...annotation, color: currentColor }
-              : annotation
-          )
+          prev.map((a) => a.id === highlightId && a.type === 'highlight' ? { ...a, color: currentColor } : a)
         );
         return;
       }
+    }
+
+    // Color page element
+    if (shouldIgnore(target)) return;
+
+    try {
+      // Generate stable ID for O(1) lookups
+      const stableId = `annotator-el-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      target.setAttribute('data-annotator-element-id', stableId);
+
+      // Use cached XPath if available (fallback for persistence)
+      let xpath = xpathCache.current.get(target);
+      if (!xpath) {
+        xpath = getXPath(target);
+        xpathCache.current.set(target, xpath);
+      }
+
+      const modificationType = getColorType(target);
+
+      setAnnotations((prev) => {
+        // Check if this element already colored (by stableId or xpath)
+        const existing = prev.find((a) => {
+          if (a.type !== 'page-color') return false;
+          const pc = a as any;
+          return pc.stableId === stableId || pc.xpath === xpath;
+        });
+
+        if (existing) {
+          // Update color
+          return prev.map((a) => a.id === existing.id ? { ...a, color: currentColor } : a);
+        } else {
+          // Create new
+          const pageColor: any = {
+            id: `page-color-${Date.now()}-${Math.random()}`,
+            type: 'page-color',
+            xpath,
+            stableId,
+            color: currentColor,
+            modificationType,
+            timestamp: Date.now(),
+          };
+          return [...prev, pageColor];
+        }
+      });
+    } catch (error) {
+      // Ignore - couldn't get XPath
     }
   }, []);
 
@@ -305,6 +374,69 @@ export const App: React.FC = () => {
     };
   }, [isEnabled, currentTool, handlePaintBucket]);
 
+  // Paint bucket hover preview (throttled with requestAnimationFrame)
+  useEffect(() => {
+    if (!isEnabled || currentTool !== 'paint-bucket') {
+      return;
+    }
+
+    let lastHoverElement: HTMLElement | null = null;
+    let rafId: number | null = null;
+    let pendingTarget: HTMLElement | null = null;
+
+    const updateHover = () => {
+      rafId = null;
+      if (!pendingTarget) return;
+
+      const target = pendingTarget;
+      pendingTarget = null;
+
+      // Skip if same element
+      if (lastHoverElement === target) {
+        return;
+      }
+
+      // Clear previous hover
+      if (lastHoverElement) {
+        lastHoverElement.style.outline = '';
+        lastHoverElement.style.outlineOffset = '';
+      }
+
+      // Skip ignored elements
+      if (shouldIgnore(target)) {
+        lastHoverElement = null;
+        return;
+      }
+
+      // Add hover outline
+      target.style.outline = `2px dashed ${currentColor}`;
+      target.style.outlineOffset = '2px';
+      lastHoverElement = target;
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      pendingTarget = e.target as HTMLElement;
+
+      // Throttle with requestAnimationFrame (max 60fps)
+      if (rafId === null) {
+        rafId = requestAnimationFrame(updateHover);
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove, { passive: true });
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+      if (lastHoverElement) {
+        lastHoverElement.style.outline = '';
+        lastHoverElement.style.outlineOffset = '';
+      }
+    };
+  }, [isEnabled, currentTool, currentColor]);
+
   const handleDrawingComplete = useCallback((path: Position[]) => {
     if (path.length === 0) return;
 
@@ -359,6 +491,15 @@ export const App: React.FC = () => {
         const highlightId = highlightElement.getAttribute('data-highlight-id');
         if (highlightId && !deletedIds.has(highlightId)) {
           deletedIds.add(highlightId);
+        }
+      }
+
+      // Check if we're over a page color modification
+      const pageColorElement = document.elementFromPoint(point.x, point.y)?.closest('[data-page-color-id]');
+      if (pageColorElement) {
+        const pageColorId = pageColorElement.getAttribute('data-page-color-id');
+        if (pageColorId && !deletedIds.has(pageColorId)) {
+          deletedIds.add(pageColorId);
         }
       }
     }
@@ -497,6 +638,10 @@ export const App: React.FC = () => {
               onClearAll={handleClearAll}
             />
           </div>
+
+      <PageColorLayer
+        pageColors={annotations.filter((a) => a.type === 'page-color') as any[]}
+      />
 
       <HighlightLayer
         highlights={highlights}

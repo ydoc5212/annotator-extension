@@ -315,6 +315,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             onClick={onClearAll}
             style={{
               width: '32px',
+              minWidth: '32px',
+              maxWidth: '32px',
+              height: 'auto',
               backgroundColor: '#ffffff',
               color: '#64748b',
               border: '1.5px solid #e2e8f0',
@@ -331,6 +334,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               position: 'relative',
               transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
               boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+              lineHeight: '1',
+              textAlign: 'center',
+              verticalAlign: 'middle',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = '#fef2f2';
@@ -345,11 +351,16 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)';
             }}
           >
-            <Trash2 size={14} />
+            <Trash2 size={14} style={{ flexShrink: 0 }} />
             <div style={{
-              writingMode: 'vertical-rl',
-              textOrientation: 'upright',
+              writingMode: 'vertical-rl' as const,
+              textOrientation: 'upright' as const,
               letterSpacing: '-1px',
+              fontSize: '10px',
+              fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
+              fontWeight: '500',
+              lineHeight: '1',
+              whiteSpace: 'nowrap',
             }}>CLEAR</div>
           </button>
         </div>

@@ -108,7 +108,8 @@ export const NoteLayer: React.FC<NoteLayerProps> = ({ notes, onDelete, onUpdate,
       handleSaveEdit(id);
     } else if (e.key === 'Escape') {
       e.preventDefault();
-      handleCancelEdit();
+      // Save the note instead of canceling, then blur
+      handleSaveEdit(id);
     }
   };
 

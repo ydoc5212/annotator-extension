@@ -1,4 +1,4 @@
-export type AnnotationType = 'highlight' | 'note' | 'drawing';
+export type AnnotationType = 'highlight' | 'note' | 'drawing' | 'page-color';
 
 export type ToolType = AnnotationType | 'eraser' | 'select' | 'paint-bucket';
 
@@ -38,7 +38,17 @@ export interface DrawingAnnotation {
   timestamp: number;
 }
 
-export type Annotation = HighlightAnnotation | NoteAnnotation | DrawingAnnotation;
+export interface PageColorAnnotation {
+  id: string;
+  type: 'page-color';
+  xpath: string;
+  stableId?: string; // Injected data attribute for fast O(1) lookups
+  color: string;
+  modificationType: 'text' | 'background';
+  timestamp: number;
+}
+
+export type Annotation = HighlightAnnotation | NoteAnnotation | DrawingAnnotation | PageColorAnnotation;
 
 export interface AnnotationStorage {
   [url: string]: Annotation[];

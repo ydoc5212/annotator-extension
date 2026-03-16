@@ -1,0 +1,1 @@
+import { createRoot } from "react-dom/client"; function Popup() { return <div style={{ width: 200, padding: 20, fontFamily: "sans-serif" }}><h1>Web Annotator</h1><p>Press <kbd>`</kbd> on any page to annotate.</p></div>; } createRoot(document.getElementById("app")!).render(<Popup />);

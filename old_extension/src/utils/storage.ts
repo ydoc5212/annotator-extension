@@ -3,16 +3,25 @@ import { Annotation, AnnotationStorage } from '../types';
 const STORAGE_KEY = 'web_annotator_data';
 const ENABLED_STATE_KEY = 'web_annotator_enabled_state';
 
+// Debounce storage writes to avoid blocking main thread on every click
+let saveTimeout: NodeJS.Timeout | null = null;
+
 // Use localStorage instead of chrome.storage to survive extension reloads
 export async function saveAnnotations(url: string, annotations: Annotation[]): Promise<void> {
-  try {
-    const storageData = localStorage.getItem(STORAGE_KEY);
-    const storage: AnnotationStorage = storageData ? JSON.parse(storageData) : {};
-    storage[url] = annotations;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(storage));
-  } catch (error) {
-    console.error('Error saving annotations:', error);
-  }
+  // Clear existing timeout
+  if (saveTimeout) clearTimeout(saveTimeout);
+
+  // Debounce writes to max once per 300ms
+  saveTimeout = setTimeout(() => {
+    try {
+      const storageData = localStorage.getItem(STORAGE_KEY);
+      const storage: AnnotationStorage = storageData ? JSON.parse(storageData) : {};
+      storage[url] = annotations;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(storage));
+    } catch (error) {
+      console.error('Error saving annotations:', error);
+    }
+  }, 300);
 }
 
 export async function loadAnnotations(url: string): Promise<Annotation[]> {
